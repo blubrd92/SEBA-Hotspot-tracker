@@ -1,25 +1,21 @@
 // ─────────────────────────────────────────────────────────────
 // Firebase configuration
 //
-// Until you fill this in, the site runs in DEMO MODE: everything
-// works, but data is stored only in this browser (localStorage)
-// and is not shared between computers.
+// These values are public identifiers, not secrets — access to the
+// database is controlled by the Firestore rules (see firestore.rules).
 //
-// To go live (see README.md for the full walkthrough):
-//   1. Create a Firebase project at https://console.firebase.google.com
-//   2. Add a Web App to the project (the </> icon)
-//   3. Copy the "firebaseConfig" values it shows you over the
-//      placeholders below
-//   4. Commit and push — GitHub Pages redeploys automatically
+// If they're ever replaced with PASTE_... placeholders, the site
+// falls back to DEMO MODE: everything works, but data is stored only
+// in the local browser and is not shared between computers.
 // ─────────────────────────────────────────────────────────────
 
 export const firebaseConfig = {
-  apiKey: "PASTE_YOUR_API_KEY",
-  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
-  projectId: "PASTE_YOUR_PROJECT_ID",
-  storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
-  messagingSenderId: "PASTE_YOUR_SENDER_ID",
-  appId: "PASTE_YOUR_APP_ID",
+  apiKey: "AIzaSyBAfRUK-ircPWWz3vbT9rtV0TFeBU0wE7U",
+  authDomain: "seba-device-tracker.firebaseapp.com",
+  projectId: "seba-device-tracker",
+  storageBucket: "seba-device-tracker.firebasestorage.app",
+  messagingSenderId: "438596128416",
+  appId: "1:438596128416:web:df467d2b2c708968d283c5",
 };
 
 // True while the placeholders above are untouched.
