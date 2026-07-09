@@ -18,5 +18,10 @@ export const firebaseConfig = {
   appId: "1:438596128416:web:df467d2b2c708968d283c5",
 };
 
-// True while the placeholders above are untouched.
-export const isDemoMode = firebaseConfig.projectId.startsWith("PASTE_");
+// Demo mode when the placeholders are untouched, or when the page is
+// opened with ?demo in the URL (handy for previewing the interface
+// without touching the live shared data).
+const demoOverride =
+  typeof location !== "undefined" && new URLSearchParams(location.search).has("demo");
+
+export const isDemoMode = demoOverride || firebaseConfig.projectId.startsWith("PASTE_");

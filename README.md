@@ -102,3 +102,5 @@ updates within a second. That's the whole tool working.
   counts shown are the last known ones and taps sync when it reconnects.
 - **Changes rejected / counts snap back** — the Firestore rules from step 2.3
   probably weren't published, or were edited; re-paste `firestore.rules`.
+- **Want to poke around without touching real data?** — add `?demo` to the
+  page address to run it on browser-local demo data.

@@ -18,7 +18,7 @@
 import { firebaseConfig, isDemoMode } from "./firebase-config.js";
 
 const COUNT_MAX = 999;
-const ACTIVITY_SHOWN = 25;
+const ACTIVITY_SHOWN = 10;
 const ACTIVITY_KEEP = 200;
 
 const DEFAULT_DEVICE_TYPES = [
