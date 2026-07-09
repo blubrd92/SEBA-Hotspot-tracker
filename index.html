@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>SEBA Device Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>📚 SEBA Device Tracker</h1>
+    <div class="topbar-actions">
+      <span id="status-pill" class="status-pill" role="status">Connecting…</span>
+      <a class="btn btn-ghost" href="display.html" title="Read-only view with big numbers, for a back-office monitor">🖥️ Display mode</a>
+      <button id="settings-btn" class="btn btn-ghost" title="Add, rename, reorder, or remove device types">⚙️ Edit devices</button>
+    </div>
+  </header>
+
+  <div id="demo-banner" class="demo-banner" hidden>
+    <strong>Demo mode</strong> — data is saved only in this browser.
+    Fill in <code>js/firebase-config.js</code> (see the README) to share live counts between computers.
+  </div>
+
+  <main>
+    <div id="cards" class="cards" aria-live="polite">
+      <p class="loading">Loading…</p>
+    </div>
+
+    <details id="activity" class="activity">
+      <summary>🕐 Recent activity</summary>
+      <ul id="activity-list" class="activity-list">
+        <li class="activity-empty">No changes yet.</li>
+      </ul>
+    </details>
+  </main>
+
+  <footer class="pagefoot">
+    <p>Tap <strong>+</strong>/<strong>−</strong> when a device goes out or comes back · click a number to type an exact count · every screen updates live.</p>
+  </footer>
+
+  <dialog id="settings-dialog" class="settings-dialog">
+    <h2>Edit device types</h2>
+    <p class="settings-hint">Changes apply everywhere immediately.</p>
+    <ul id="settings-list" class="settings-list"></ul>
+    <form id="add-form" class="add-form">
+      <input id="add-emoji" type="text" maxlength="4" placeholder="📟" aria-label="Emoji for new device type">
+      <input id="add-name" type="text" maxlength="40" placeholder="New device type (e.g. Tablets)" aria-label="Name for new device type" required>
+      <button type="submit" class="btn btn-primary">Add</button>
+    </form>
+    <div class="dialog-actions">
+      <button id="settings-close" class="btn">Done</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

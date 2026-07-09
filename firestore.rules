@@ -1,0 +1,53 @@
+rules_version = '2';
+
+// Anyone with the link can read and write (matching how staff use the
+// tool), but writes are strictly validated: only the two expected
+// collections, only the expected fields, counts locked to 0–999, and
+// text lengths capped. This keeps an open database from being usable
+// as free-form storage by anyone who finds the URL.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isCount(n) {
+      return n is int && n >= 0 && n <= 999;
+    }
+
+    match /deviceTypes/{id} {
+      allow read: if true;
+      allow create, update: if
+        request.resource.data.keys().hasOnly(
+          ['name', 'emoji', 'order', 'available', 'mending', 'updatedAt']
+        )
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 40
+        && request.resource.data.emoji is string
+        && request.resource.data.emoji.size() <= 16
+        && request.resource.data.order is int
+        && isCount(request.resource.data.available)
+        && isCount(request.resource.data.mending);
+      allow delete: if true;
+    }
+
+    match /activity/{id} {
+      allow read: if true;
+      allow create: if
+        request.resource.data.keys().hasOnly(
+          ['deviceTypeName', 'field', 'from', 'to', 'at']
+        )
+        && request.resource.data.deviceTypeName is string
+        && request.resource.data.deviceTypeName.size() <= 40
+        && request.resource.data.field in ['available', 'mending']
+        && isCount(request.resource.data.from)
+        && isCount(request.resource.data.to)
+        && request.resource.data.at == request.time;
+      allow update: if false;
+      allow delete: if true; // the app trims old entries itself
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
