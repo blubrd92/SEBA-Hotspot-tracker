@@ -95,13 +95,12 @@ function countBlock(d, field) {
         <button class="step" data-action="adjust" data-field="${field}" data-delta="-1"
           ${n === 0 ? "disabled" : ""}
           aria-label="One ${FIELD_LABELS[field].toLowerCase()} ${esc(d.name)} fewer">−</button>
-        <button class="step zero" data-action="zero" data-field="${field}"
-          ${n === 0 ? "disabled" : ""}
-          title="Reset to zero"
-          aria-label="Reset ${esc(d.name)} ${FIELD_LABELS[field].toLowerCase()} to zero">0</button>
         <button class="step" data-action="adjust" data-field="${field}" data-delta="1"
           aria-label="One ${FIELD_LABELS[field].toLowerCase()} ${esc(d.name)} more">+</button>
       </div>
+      <button class="zero-btn" data-action="zero" data-field="${field}"
+        ${n === 0 ? "disabled" : ""}
+        aria-label="Set ${esc(d.name)} ${FIELD_LABELS[field].toLowerCase()} to zero">Set to 0</button>
     </section>`;
 }
 

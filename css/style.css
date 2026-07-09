@@ -251,11 +251,20 @@ main {
 .step:active { transform: scale(0.97); }
 .step:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.step.zero {
-  flex: 0.65;
-  font-size: 20px;
+.zero-btn {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 7px 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
   color: var(--text-soft);
+  cursor: pointer;
 }
+
+.zero-btn:hover { border-color: var(--text-soft); color: var(--text); }
+.zero-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .count-num {
   font: inherit;
