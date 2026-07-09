@@ -332,13 +332,11 @@ main {
 .delta-up { color: var(--green-text); font-weight: 700; }
 .delta-down { color: var(--red-text); font-weight: 700; }
 
-.pagefoot {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 20px 28px;
+.usage-hint {
+  margin: 22px 4px;
   text-align: center;
   color: var(--text-soft);
-  font-size: 13px;
+  font-size: 16px;
 }
 
 /* ── Settings dialog ─────────────────────────────── */
