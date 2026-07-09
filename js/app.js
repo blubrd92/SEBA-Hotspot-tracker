@@ -95,6 +95,10 @@ function countBlock(d, field) {
         <button class="step" data-action="adjust" data-field="${field}" data-delta="-1"
           ${n === 0 ? "disabled" : ""}
           aria-label="One ${FIELD_LABELS[field].toLowerCase()} ${esc(d.name)} fewer">−</button>
+        <button class="step zero" data-action="zero" data-field="${field}"
+          ${n === 0 ? "disabled" : ""}
+          title="Reset to zero"
+          aria-label="Reset ${esc(d.name)} ${FIELD_LABELS[field].toLowerCase()} to zero">0</button>
         <button class="step" data-action="adjust" data-field="${field}" data-delta="1"
           aria-label="One ${FIELD_LABELS[field].toLowerCase()} ${esc(d.name)} more">+</button>
       </div>
@@ -111,6 +115,13 @@ function wireCardEvents() {
 
     if (btn.dataset.action === "adjust") {
       store.adjustCount(id, field, Number(btn.dataset.delta));
+    } else if (btn.dataset.action === "zero") {
+      const device = devices.find((d) => d.id === id);
+      if (!device || device[field] === 0) return;
+      const ok = confirm(
+        `Set ${device.name} ${FIELD_LABELS[field].toLowerCase()} to 0? (currently ${device[field]})`
+      );
+      if (ok) store.setCount(id, field, 0);
     } else if (btn.dataset.action === "edit") {
       openInlineEdit(btn, id, field);
     }
