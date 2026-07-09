@@ -114,6 +114,12 @@ function wireCardEvents() {
 
     if (btn.dataset.action === "adjust") {
       store.adjustCount(id, field, Number(btn.dataset.delta));
+    } else if (btn.dataset.action === "confirm-edit") {
+      // The zero button doubles as a confirm button while a count is
+      // being typed. Blurring the input commits it (or cancels when
+      // empty). In browsers where clicking a button already blurred
+      // the input, the re-render replaced this node and we never get here.
+      document.querySelector(".count-edit")?.blur();
     } else if (btn.dataset.action === "zero") {
       const device = devices.find((d) => d.id === id);
       if (!device || device[field] === 0) return;
@@ -138,6 +144,22 @@ function openInlineEdit(numBtn, id, field) {
   numBtn.replaceWith(input);
   input.focus();
   input.select();
+
+  // While typing, the "Set to 0" button below becomes the live confirm
+  // button ("Set to 12"), or "Cancel" when the input is empty. The
+  // re-render at the end of the edit restores it.
+  const zeroBtn = input.closest(".count")?.querySelector(".zero-btn");
+  if (zeroBtn) {
+    zeroBtn.dataset.action = "confirm-edit";
+    zeroBtn.disabled = false;
+    const updateLabel = () => {
+      const v = input.value.trim();
+      zeroBtn.textContent =
+        v === "" ? "Cancel" : `Set to ${Math.max(0, Math.min(999, parseInt(v, 10) || 0))}`;
+    };
+    updateLabel();
+    input.addEventListener("input", updateLabel);
+  }
 
   let done = false;
   const finish = (commit) => {
