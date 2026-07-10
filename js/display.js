@@ -2,6 +2,7 @@
 // Leave it open fullscreen on a back-office monitor.
 
 import { createStore } from "./store.js";
+import { esc, keepDemoParam } from "./util.js";
 
 const grid = document.getElementById("display-grid");
 const statusEl = document.getElementById("display-status");
@@ -12,7 +13,19 @@ let prevCounts = new Map(); // id -> {available, mending}, to detect changes
 init();
 
 async function init() {
-  const store = await createStore();
+  keepDemoParam();
+  tickClock();
+  setInterval(tickClock, 10_000);
+
+  let store;
+  try {
+    store = await createStore();
+  } catch (e) {
+    console.error("Could not start the data store:", e);
+    statusEl.textContent = "❌ Can't connect — the network may be blocking Firebase";
+    grid.innerHTML = '<p class="loading">The live database couldn\'t be loaded. Reload to try again.</p>';
+    return;
+  }
 
   store.onStatus((status) => {
     statusEl.textContent =
@@ -20,13 +33,12 @@ async function init() {
         ? "● Live — updates automatically"
         : status === "offline"
           ? "⚠ Offline — showing last known counts"
-          : "Demo mode — data from this browser only";
+          : status === "connecting"
+            ? "Connecting…"
+            : "Demo mode — data from this browser only";
   });
 
   store.onDeviceTypes(render);
-
-  tickClock();
-  setInterval(tickClock, 10_000);
 }
 
 function render(devices) {
@@ -61,11 +73,4 @@ function tickClock() {
     hour: "numeric",
     minute: "2-digit",
   });
-}
-
-function esc(s) {
-  return String(s ?? "").replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
-  );
 }

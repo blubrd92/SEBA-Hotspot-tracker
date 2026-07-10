@@ -21,7 +21,7 @@ export const firebaseConfig = {
 // Demo mode when the placeholders are untouched, or when the page is
 // opened with ?demo in the URL (handy for previewing the interface
 // without touching the live shared data).
-const demoOverride =
+export const isDemoOverride =
   typeof location !== "undefined" && new URLSearchParams(location.search).has("demo");
 
-export const isDemoMode = demoOverride || firebaseConfig.projectId.startsWith("PASTE_");
+export const isDemoMode = isDemoOverride || firebaseConfig.projectId.startsWith("PASTE_");

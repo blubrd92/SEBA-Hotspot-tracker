@@ -46,6 +46,16 @@ service cloud.firestore {
       allow delete: if true; // the app trims old entries itself
     }
 
+    // One-time marker written when the app seeds the default device
+    // types, so deleting every device type later doesn't re-seed them.
+    match /meta/setup {
+      allow read: if true;
+      allow create: if
+        request.resource.data.keys().hasOnly(['seededAt'])
+        && request.resource.data.seededAt == request.time;
+      allow update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

@@ -1,6 +1,8 @@
 // Main tracker page.
 
 import { createStore } from "./store.js";
+import { isDemoOverride } from "./firebase-config.js";
+import { esc, keepDemoParam } from "./util.js";
 
 const cardsEl = document.getElementById("cards");
 const statusPill = document.getElementById("status-pill");
@@ -12,24 +14,47 @@ const settingsList = document.getElementById("settings-list");
 let store;
 let devices = [];
 let editing = null; // {id, field} while a count is being typed
+let settingsStale = false; // remote change arrived while the dialog had focus
 
 const FIELD_LABELS = { available: "Available", mending: "Mending" };
 
 init();
 
 async function init() {
-  store = await createStore();
+  keepDemoParam();
 
-  if (store.mode === "demo") demoBanner.hidden = false;
+  try {
+    store = await createStore();
+  } catch (e) {
+    console.error("Could not start the data store:", e);
+    statusPill.classList.add("error");
+    statusPill.textContent = "❌ Can't connect";
+    cardsEl.innerHTML =
+      '<p class="loading">The live database couldn\'t be loaded — the network may be blocking Firebase. ' +
+      'Reload to try again, or add <code>?demo</code> to the address to practice on local data.</p>';
+    return;
+  }
+
+  if (store.mode === "demo") {
+    demoBanner.hidden = false;
+    if (isDemoOverride) {
+      demoBanner.innerHTML =
+        "<strong>Practice mode</strong> — you opened this page with <code>?demo</code>, so changes " +
+        "are saved only in this browser and don't touch the shared counts. " +
+        "Remove <code>?demo</code> from the address to go back to the live tracker.";
+    }
+  }
 
   store.onStatus((status) => {
-    statusPill.classList.remove("live", "offline");
+    statusPill.classList.remove("live", "offline", "error");
     if (status === "live") {
       statusPill.classList.add("live");
       statusPill.textContent = "● Live";
     } else if (status === "offline") {
       statusPill.classList.add("offline");
       statusPill.textContent = "⚠ Offline — showing last known counts";
+    } else if (status === "connecting") {
+      statusPill.textContent = "Connecting…";
     } else {
       statusPill.textContent = "Demo mode";
     }
@@ -38,6 +63,7 @@ async function init() {
   store.onDeviceTypes((list) => {
     devices = list;
     renderCards();
+    refreshSettingsIfSafe();
   });
 
   store.onActivity(renderActivity);
@@ -51,6 +77,32 @@ async function init() {
 
   wireCardEvents();
   wireSettings();
+}
+
+// ── Save-failure feedback ──────────────────────────
+
+// Writes normally just work (Firestore queues them while offline), so a
+// rejection means something real — security rules said no, or the SDK
+// gave up. Surface it instead of letting the promise fail silently.
+let toastTimer;
+function showToast(message) {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.hidden = true;
+  }, 6000);
+}
+
+function guarded(promise) {
+  return promise.catch((e) => {
+    console.error("Save failed:", e);
+    showToast(
+      "⚠ That change didn't save — it may have been rejected or the connection dropped. " +
+        "The numbers shown are the shared counts."
+    );
+  });
 }
 
 // ── Cards ──────────────────────────────────────────
@@ -113,7 +165,7 @@ function wireCardEvents() {
     if (!id) return;
 
     if (btn.dataset.action === "adjust") {
-      store.adjustCount(id, field, Number(btn.dataset.delta));
+      guarded(store.adjustCount(id, field, Number(btn.dataset.delta)));
     } else if (btn.dataset.action === "confirm-edit") {
       // The zero button doubles as a confirm button while a count is
       // being typed. Blurring the input commits it (or cancels when
@@ -126,7 +178,7 @@ function wireCardEvents() {
       const ok = confirm(
         `Set ${device.name} ${FIELD_LABELS[field].toLowerCase()} to 0? (currently ${device[field]})`
       );
-      if (ok) store.setCount(id, field, 0);
+      if (ok) guarded(store.setCount(id, field, 0));
     } else if (btn.dataset.action === "edit") {
       openInlineEdit(btn, id, field);
     }
@@ -166,7 +218,7 @@ function openInlineEdit(numBtn, id, field) {
     if (done) return;
     done = true;
     if (commit && input.value !== "") {
-      store.setCount(id, field, input.value);
+      guarded(store.setCount(id, field, input.value));
     }
     editing = null;
     renderCards();
@@ -219,7 +271,7 @@ function wireSettings() {
     const emojiEl = document.getElementById("add-emoji");
     const name = nameEl.value.trim();
     if (!name) return;
-    await store.addDeviceType(name, emojiEl.value.trim());
+    await guarded(store.addDeviceType(name, emojiEl.value.trim()));
     nameEl.value = "";
     emojiEl.value = "";
     renderSettingsList();
@@ -232,14 +284,14 @@ function wireSettings() {
     const device = devices.find((d) => d.id === id);
     if (!device) return;
 
-    if (btn.dataset.action === "up") await store.moveDeviceType(id, -1);
-    if (btn.dataset.action === "down") await store.moveDeviceType(id, 1);
+    if (btn.dataset.action === "up") await guarded(store.moveDeviceType(id, -1));
+    if (btn.dataset.action === "down") await guarded(store.moveDeviceType(id, 1));
     if (btn.dataset.action === "delete") {
       const ok = confirm(
         `Remove "${device.name}"?\n\nIts counts and card disappear for everyone. This can't be undone.`
       );
       if (!ok) return;
-      await store.deleteDeviceType(id);
+      await guarded(store.deleteDeviceType(id));
     }
     renderSettingsList();
   });
@@ -258,11 +310,12 @@ function wireSettings() {
 }
 
 function renderSettingsList() {
+  settingsStale = false;
   const sorted = [...devices].sort((a, b) => a.order - b.order);
   settingsList.innerHTML = sorted
     .map(
       (d, i) => `
-    <li data-id="${d.id}">
+    <li data-id="${d.id}" data-orig-name="${esc(d.name)}" data-orig-emoji="${esc(d.emoji)}">
       <input type="text" class="settings-emoji" maxlength="4" value="${esc(d.emoji)}" aria-label="Emoji for ${esc(d.name)}">
       <input type="text" class="settings-name" maxlength="40" value="${esc(d.name)}" aria-label="Name for ${esc(d.name)}">
       <button class="icon-btn" data-action="up" title="Move up" ${i === 0 ? "disabled" : ""}>↑</button>
@@ -273,25 +326,40 @@ function renderSettingsList() {
     .join("");
 }
 
+// Keep the open settings dialog in sync with changes from other desks,
+// but never yank the list out from under someone who is typing in it —
+// in that case just mark it stale; the next snapshot or action retries.
+function refreshSettingsIfSafe() {
+  if (!settingsDialog.open) return;
+  if (settingsList.contains(document.activeElement)) {
+    settingsStale = true;
+    return;
+  }
+  renderSettingsList();
+}
+
 function commitRename(li) {
   if (!li) return;
   const id = li.dataset.id;
-  const device = devices.find((d) => d.id === id);
-  if (!device) return;
+  if (!devices.some((d) => d.id === id)) return;
   const name = li.querySelector(".settings-name").value.trim();
   const emoji = li.querySelector(".settings-emoji").value.trim();
-  if (!name || (name === device.name && emoji === device.emoji)) return;
-  store.updateDeviceType(id, { name, emoji });
+  // Compare against what this row was rendered with (not live data) and
+  // send only the fields the user actually edited, so a stale dialog
+  // can't overwrite someone else's concurrent change to the other field.
+  const updates = {};
+  if (name && name !== li.dataset.origName) updates.name = name;
+  if (emoji !== li.dataset.origEmoji) updates.emoji = emoji;
+  if (Object.keys(updates).length === 0) {
+    if (settingsStale) refreshSettingsIfSafe();
+    return;
+  }
+  if (updates.name !== undefined) li.dataset.origName = updates.name;
+  if (updates.emoji !== undefined) li.dataset.origEmoji = updates.emoji;
+  guarded(store.updateDeviceType(id, updates));
 }
 
 // ── Helpers ────────────────────────────────────────
-
-function esc(s) {
-  return String(s ?? "").replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
-  );
-}
 
 function timeAgo(date) {
   const mins = Math.floor((Date.now() - date.getTime()) / 60_000);

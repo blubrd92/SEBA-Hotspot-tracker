@@ -44,23 +44,46 @@ async function createFirestoreStore() {
 
   const app = initializeApp(firebaseConfig);
   // Local cache keeps the last-known counts visible through Wi-Fi blips
-  // and syncs across tabs on the same computer.
-  const db = fs.initializeFirestore(app, {
-    localCache: fs.persistentLocalCache({
-      tabManager: fs.persistentMultipleTabManager(),
-    }),
-  });
+  // and syncs across tabs on the same computer. If persistence isn't
+  // available (some private-browsing modes), fall back to memory-only
+  // rather than failing to start.
+  let db;
+  try {
+    db = fs.initializeFirestore(app, {
+      localCache: fs.persistentLocalCache({
+        tabManager: fs.persistentMultipleTabManager(),
+      }),
+    });
+  } catch (e) {
+    console.warn("Persistent cache unavailable, using in-memory cache:", e);
+    db = fs.getFirestore(app);
+  }
 
   const deviceTypesCol = fs.collection(db, "deviceTypes");
   const activityCol = fs.collection(db, "activity");
 
   let latest = new Map(); // id -> device type data, for from→to activity entries
   let statusCb = null;
-  let status = "offline";
+  let status = "connecting";
+  let everLive = false;
   const setStatus = (s) => {
     if (s !== status) {
       status = s;
       statusCb?.(status);
+    }
+  };
+  // Cache-only snapshots during startup mean "still connecting", not
+  // "offline" — only show the offline warning once we've either been
+  // live before or given the first connection a fair chance.
+  setTimeout(() => {
+    if (!everLive && status === "connecting") setStatus("offline");
+  }, 6000);
+  const noteSnapshot = (fromCache) => {
+    if (!fromCache) {
+      everLive = true;
+      setStatus("live");
+    } else if (everLive) {
+      setStatus("offline");
     }
   };
 
@@ -68,6 +91,13 @@ async function createFirestoreStore() {
   async function seedIfEmpty(snapshotEmpty) {
     if (seedChecked || !snapshotEmpty) return;
     seedChecked = true;
+    // Only seed on a true first run. The meta/setup marker records that
+    // setup already happened, so deliberately deleting every device type
+    // doesn't resurrect the defaults.
+    const markerRef = fs.doc(db, "meta", "setup");
+    const marker = await fs.getDoc(markerRef);
+    if (marker.exists()) return;
+    await fs.setDoc(markerRef, { seededAt: fs.serverTimestamp() });
     // Fixed doc IDs make this idempotent if two browsers race on first run.
     await Promise.all(
       DEFAULT_DEVICE_TYPES.map((d) => {
@@ -112,9 +142,11 @@ async function createFirestoreStore() {
         fs.query(deviceTypesCol, fs.orderBy("order")),
         { includeMetadataChanges: true },
         (snap) => {
-          setStatus(snap.metadata.fromCache ? "offline" : "live");
+          noteSnapshot(snap.metadata.fromCache);
           const list = snap.docs.map((d) => {
-            const data = d.data();
+            // "estimate" keeps updatedAt usable on latency-compensated
+            // snapshots instead of null while the server timestamp is pending.
+            const data = d.data({ serverTimestamps: "estimate" });
             return {
               id: d.id,
               name: data.name ?? "",
@@ -142,7 +174,7 @@ async function createFirestoreStore() {
         (snap) => {
           cb(
             snap.docs.map((d) => {
-              const data = d.data();
+              const data = d.data({ serverTimestamps: "estimate" });
               return { id: d.id, ...data, at: data.at?.toDate?.() ?? null };
             })
           );
@@ -186,21 +218,30 @@ async function createFirestoreStore() {
     },
 
     async addDeviceType(name, emoji) {
+      // Date.now() keeps concurrently-added types from colliding on the
+      // same order value (which would make the reorder arrows no-ops);
+      // maxOrder+1 keeps "append at end" even with a skewed clock.
       const maxOrder = Math.max(-1, ...[...latest.values()].map((d) => d.order));
       await fs.addDoc(deviceTypesCol, {
         name,
         emoji,
-        order: maxOrder + 1,
+        order: Math.max(maxOrder + 1, Date.now()),
         available: 0,
         mending: 0,
         updatedAt: fs.serverTimestamp(),
       });
     },
 
-    async updateDeviceType(id, { name, emoji }) {
+    async updateDeviceType(id, fields) {
+      // Partial update: only touch the fields the caller actually changed,
+      // so a stale settings dialog can't clobber a concurrent edit to the
+      // other field from another desk.
+      const updates = {};
+      if (fields.name !== undefined) updates.name = fields.name;
+      if (fields.emoji !== undefined) updates.emoji = fields.emoji;
+      if (Object.keys(updates).length === 0) return;
       await fs.updateDoc(fs.doc(deviceTypesCol, id), {
-        name,
-        emoji,
+        ...updates,
         updatedAt: fs.serverTimestamp(),
       });
     },
@@ -331,7 +372,7 @@ function createDemoStore() {
         id: String(Date.now()) + Math.random().toString(36).slice(2),
         name,
         emoji,
-        order: maxOrder + 1,
+        order: Math.max(maxOrder + 1, Date.now()),
         available: 0,
         mending: 0,
         updatedAt: Date.now(),
@@ -339,11 +380,11 @@ function createDemoStore() {
       persistAndNotify();
     },
 
-    async updateDeviceType(id, { name, emoji }) {
+    async updateDeviceType(id, fields) {
       const d = find(id);
       if (!d) return;
-      d.name = name;
-      d.emoji = emoji;
+      if (fields.name !== undefined) d.name = fields.name;
+      if (fields.emoji !== undefined) d.emoji = fields.emoji;
       d.updatedAt = Date.now();
       persistAndNotify();
     },
