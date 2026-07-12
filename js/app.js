@@ -2,7 +2,7 @@
 
 import { createStore } from "./store.js";
 import { isDemoOverride } from "./firebase-config.js";
-import { esc, keepDemoParam } from "./util.js";
+import { esc, keepDemoParam, scheduleDailyReload } from "./util.js";
 
 const cardsEl = document.getElementById("cards");
 const statusPill = document.getElementById("status-pill");
@@ -22,6 +22,7 @@ init();
 
 async function init() {
   keepDemoParam();
+  scheduleDailyReload();
 
   try {
     store = await createStore();

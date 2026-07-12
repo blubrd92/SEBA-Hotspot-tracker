@@ -87,6 +87,41 @@ async function createFirestoreStore() {
     }
   };
 
+  // Network problems retry inside the SDK, but errors like a (temporarily)
+  // broken rules deploy cancel an onSnapshot listener permanently. Without
+  // this, a wall display would sit frozen on "Offline" until someone
+  // reloads the page — even after the rules are fixed. Re-subscribe with
+  // exponential backoff instead.
+  function listenForever(query, options, handler, label) {
+    let delay = 5_000;
+    let stopped = false;
+    let unsubscribe = () => {};
+    const subscribe = () => {
+      unsubscribe = fs.onSnapshot(
+        query,
+        options,
+        (snap) => {
+          delay = 5_000; // healthy again — reset the backoff
+          handler(snap);
+        },
+        (err) => {
+          console.error(`${label} listener error, retrying in ${delay / 1000}s:`, err);
+          setStatus("offline");
+          if (stopped) return;
+          setTimeout(() => {
+            if (!stopped) subscribe();
+          }, delay);
+          delay = Math.min(delay * 2, 300_000);
+        }
+      );
+    };
+    subscribe();
+    return () => {
+      stopped = true;
+      unsubscribe();
+    };
+  }
+
   let seedChecked = false;
   async function seedIfEmpty(snapshotEmpty) {
     if (seedChecked || !snapshotEmpty) return;
@@ -138,7 +173,7 @@ async function createFirestoreStore() {
     mode: "firebase",
 
     onDeviceTypes(cb) {
-      return fs.onSnapshot(
+      return listenForever(
         fs.query(deviceTypesCol, fs.orderBy("order")),
         { includeMetadataChanges: true },
         (snap) => {
@@ -161,16 +196,14 @@ async function createFirestoreStore() {
           seedIfEmpty(snap.empty && !snap.metadata.fromCache).catch(console.warn);
           cb(list);
         },
-        (err) => {
-          console.error("deviceTypes listener error:", err);
-          setStatus("offline");
-        }
+        "deviceTypes"
       );
     },
 
     onActivity(cb) {
-      return fs.onSnapshot(
+      return listenForever(
         fs.query(activityCol, fs.orderBy("at", "desc"), fs.limit(ACTIVITY_SHOWN)),
+        {},
         (snap) => {
           cb(
             snap.docs.map((d) => {
@@ -179,7 +212,7 @@ async function createFirestoreStore() {
             })
           );
         },
-        (err) => console.error("activity listener error:", err)
+        "activity"
       );
     },
 

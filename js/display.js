@@ -2,7 +2,7 @@
 // Leave it open fullscreen on a back-office monitor.
 
 import { createStore } from "./store.js";
-import { esc, keepDemoParam } from "./util.js";
+import { esc, keepDemoParam, scheduleDailyReload } from "./util.js";
 
 const grid = document.getElementById("display-grid");
 const statusEl = document.getElementById("display-status");
@@ -14,6 +14,7 @@ init();
 
 async function init() {
   keepDemoParam();
+  scheduleDailyReload();
   tickClock();
   setInterval(tickClock, 10_000);
 

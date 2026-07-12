@@ -93,6 +93,21 @@ updates within a second. That's the whole tool working.
 | `firestore.rules` | Database rules to paste into the Firebase console |
 | `css/style.css` | All styles (light/dark follows the computer's setting) |
 
+## Leaving the display on a monitor
+
+`display.html` is built to run unattended, but two computer settings make it
+bulletproof:
+
+- Keep it as the **active tab**, ideally fullscreen (press **F11**) — Chrome
+  can discard long-idle *background* tabs to save memory, and a discarded tab
+  needs a click to come back.
+- Set the computer to **not sleep** (screen off is fine on a second monitor
+  setup, but the PC itself should stay awake).
+
+The page takes care of the rest: it reconnects by itself after network drops,
+retries automatically if the database ever rejects it, and quietly reloads
+itself once a day around 4 AM to pick up new code and start fresh.
+
 ## Troubleshooting
 
 - **Yellow "Demo mode" banner won't go away** — `js/firebase-config.js` still
